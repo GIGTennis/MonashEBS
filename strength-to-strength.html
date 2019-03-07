@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>From Strength to Strength: Extensions of the Elo Rating System for Margin of Victory</title>
+    <meta charset="utf-8">
+    <meta name="author" content="Stephanie Kovalchik" />
+    <link href="strength-to-strength_files/remark-css/default.css" rel="stylesheet" />
+    <link href="strength-to-strength_files/remark-css/hygge-duke.css" rel="stylesheet" />
+    <link href="strength-to-strength_files/remark-css/robot-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="custom.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# From Strength to Strength: Extensions of the Elo Rating System for Margin of Victory
+## Monash EBS
+### Stephanie Kovalchik
+### March 8 2019
+
+---
+
+
+
+
+class: center, middle
+
+![](gig.png)
+
+---
+class: center, middle
+
+![](winprematch.jpg)
+
+---
+class: center, middle
+
+![](winswing.jpg)
+
+
+---
+class: center, middle
+
+# How Do We Pick Winners?
+
+&lt;img src="pick_a_winner.png" width=90% /&gt;
+
+---
+
+
+# Paired Comparisons
+
+--
+
+- Suppose we could measure a player's ability relative to all other players
+
+--
+
+- Call this ability, `\(\delta\)`
+
+--
+
+- The bigger `\(\delta\)` is the better
+
+--
+
+- Now, suppose player `\(A\)` and player `\(B\)` have an upcoming match
+
+--
+
+- What properties of `\(\delta_A\)` and `\(\delta_B\)` would make us favour one competitor over another?
+
+
+---
+
+# Bradely-Terry Model
+
+--
+
+- This kind of comparison of abilities is a paired comparison
+
+--
+
+- Although we don't observe player _ability_ directly, we can attempt to estimate it based on the results of head-to-head competitions
+
+--
+
+- A common model-based strategy for estimating abilities is the Bradley-Terry model 
+
+--
+
+- In this model, player `\(A\)`'s chance of winning takes the logistic form, 
+
+$$
+P(Win_{A} = 1) = \frac{\exp{(\delta_A - \delta_B)}}{1 + \exp{(\delta_A - \delta_B)}}
+$$
+
+---
+
+# Bradley-Terry Win Curve
+
+With this model, outcomes are all about the relative difference in player abilities. And those relative differences are considered constant over the period considered.
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-1-1.gif" style="display: block; margin: auto;" /&gt;
+
+&lt;br&gt;
+
+Note: You can fit these models in R with the `BradleyTerry2` package.
+
+---
+class: center, middle
+
+# But Abilities Aren't Fixed!
+
+&lt;img src="federer_titles.png" width=70% /&gt;
+
+---
+
+# Bobby Fischer
+
+.pull-left[
+&lt;img src="bobby-fischer.jpg" width=80% /&gt;
+]
+
+--
+
+.pull-right[
+![](strength-to-strength_files/figure-html/unnamed-chunk-2-1.png)&lt;!-- --&gt;
+]
+
+---
+
+# Arpad Elo
+
+.pull-left[
+&lt;img src="elo.jpg" width=75% /&gt;
+]
+
+.pull-right[
+&lt;img src="past-present-rating.jpg" width=60% /&gt;
+]
+
+---
+
+# Elo's Solution
+
+Treat player abilities as a moving target.
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-3-1.gif" style="display: block; margin: auto;" /&gt;
+
+---
+class: center, middle
+
+&lt;img src="elo_nba.png" width=110% style="margin-top:0%;" /&gt;
+
+
+---
+
+# Elo, Elo, Everywhere!
+
+&lt;img src="538.png" width=80% /&gt;
+
+
+Source: https://data.fivethirtyeight.com/
+
+---
+
+# How Elo Works 
+
+The standard Elo system is an algorithm with two steps:
+
+&lt;u&gt;E-Step:&lt;/u&gt; 
+
+Sets *E*xpectations for an upcoming match given the current ratings of competitors
+
+--
+
+&lt;u&gt;U-Step:&lt;/u&gt;
+
+*U*pdates ratings given the result and how much the result deviated from expectations
+
+---
+
+# Standard Elo E-Step
+
+Expectations are for the win result and follow a logistic curve. 
+
+`$$\hat{W}_{ij} = \frac{1}{1 + 10^{(R_j - R_i)/\sigma}}$$`
+
+--
+
+- `\(R_i\)` the rating of the `\(i\)`th player
+
+--
+
+- `\(\sigma = 400\)` in the standard Elo system (2 SD of ratings)
+
+---
+
+# E-Step in Action
+
+
+```r
+elo_estep &lt;- function(r1, r2, sigma = 400){
+  1/(1 + 10^((r2-r1) / sigma))
+}
+
+elo_estep(r1 = 2000, r2 = 1900)
+```
+
+```
+## [1] 0.640065
+```
+
+---
+
+
+```r
+curve(elo_estep(x, r2 = 1800), 
+        from = 1600,  to = 2400,
+        lwd = 2,
+        col = "red", 
+        ylab = "Player 1 Win Prediction",
+        xlab = "Player 1 Rating")
+```
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-5-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Standard Elo U-Step
+
+`$$\tilde{R}_i = R_i + K (W_{ij} - \hat{W}_{ij})$$`
+
+--
+
+- `\(W_{ij}\)` is a 0 or 1 indicator of player `\(i\)` winning against player `\(j\)`
+
+--
+
+- `\(K\)` a constant learning rate (or attenuation factor)
+
+--
+
+- Initial rating is set to some 'average' player, often `\(R_0 = 1500\)`
+
+---
+
+# U-Step in Action
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-6-1.png" width="504" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Elo Rating of Alex De Minaur
+
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-7-1.png" width="720" style="display: block; margin: auto;" /&gt;
+
+---
+
+# A Win is a Win? 
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-8-1.png" width="504" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Accounting for Margin of Victory
+
+.pull-left[
+&lt;br&gt;
+- Standard Elo ignores the _strength_ of wins. 
+
+- But what if the 'how' of a win tells us more about player ability than the win alone?
+]
+
+.pull-right[
+![](https://media.giphy.com/media/g6EWKPW3mCyje/giphy.gif)
+]
+
+
+---
+
+# Margin Of Victory Elo Models
+
+--
+
+- Linear
+
+--
+
+- Joint Additive
+
+--
+
+- Multiplicative
+
+--
+
+- Logistic
+
+---
+
+# Linear
+
+&lt;u&gt;E-Step&lt;/u&gt;
+
+`$$\hat{M}_{ij} = \frac{R_i - R_j}{\sigma}$$`
+
+--
+
+&lt;u&gt;U-Step&lt;/u&gt;
+
+`$$\tilde{R}_i = R_i + K (M_{ij} - \hat{M}_{ij})$$`
+
+---
+
+
+# Joint Additive
+
+&lt;u&gt;E-Step&lt;/u&gt;
+
+`$$\hat{M}_{ij} = \frac{R_i - R_j}{\sigma_1}$$`
+
+`$$\hat{W}_{ij} = \frac{1}{1 + 10^{(R_j - R_i)/\sigma_2}}$$`
+
+--
+
+&lt;u&gt;U-Step&lt;/u&gt;
+
+`$$\tilde{R}_i = R_i + K_1 (M_{ij} - \hat{M}_{ij}) + K_2 (W_{ij} - \hat{W}_{ij})$$`
+
+---
+
+# Multiplicative
+
+
+&lt;u&gt;E-Step&lt;/u&gt;
+
+
+`$$\hat{M}_{ij} = \frac{R_i - R_j}{\sigma_1}$$`
+
+`$$\hat{W}_{ij} = \frac{1}{1 + 10^{(R_j - R_i)/\sigma_2}}$$`
+--
+
+&lt;u&gt;U-Step&lt;/u&gt;
+
+`$$\tilde{R}_i = R_i + \frac{K}{1 + \alpha^{-|M_{ij} - \hat{M}_{ij}|}} (W_{ij} - \hat{W}_{ij})$$`
+`\(\alpha &gt; 1\)`
+
+---
+
+
+# Logistic
+
+
+&lt;u&gt;E-Step&lt;/u&gt;
+
+$$
+\hat{W}_{ij} = \frac{1}{1 + 10^{(R_j - R_i)/\sigma_2}}
+$$
+--
+
+&lt;u&gt;U-Step&lt;/u&gt;
+
+`$$\tilde{R}_i = R_i + K (\frac{1}{1 + \alpha^{M_{ji}/\sigma_1}} - \hat{W}_{ij})$$`
+
+`\(\alpha &gt; 1\)`
+
+---
+
+# The ELO MOV R Package 
+
+
+```r
+devtools::install_github("GIGTennis/elomov")
+```
+
+--
+
+
+```r
+library(elomov)
+
+example(linear) 
+```
+--
+
+
+```r
+ratings &lt;- linear(
+           ~ winner, 
+           ~ loser, 
+           ~ game_margin,
+           data = atp_games, 
+           k.margin = 3,  
+           scale.margin = 75)
+```
+
+---
+class: center, middle
+
+
+
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-13-1.gif" style="display: block; margin: auto;" /&gt;
+
+---
+
+# What Makes a Good MOV?
+
+--
+
+- Strongly related to the win result
+
+--
+
+- Scales linearly with difference in competitor ability
+
+--
+
+- Is generally available 
+
+---
+
+# Simpson's Paradox in Tennis
+
+2018 Sydney Men's Final
+
+&lt;table class='gmisc_table' style='border-collapse: collapse; width:90%;' &gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Alex De Minaur&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Daniil Medvedev&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;MATCH WIN&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;Loser&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;Winner&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;br&gt;
+&lt;br&gt;
+
+--
+
+&lt;table class='gmisc_table' style='border-collapse: collapse; width:90%;' &gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Margin of Victory&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Alex De Minaur&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Daniil Medvedev&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style='text-align: center;'&gt;GAMES WON&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;+1&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;-1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style='text-align: center;'&gt;SERVICE POINTS WON&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;-1&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;+1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;BREAK POINTS WON&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;+1&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;-1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+
+# Margin of Victory Variables
+
+
+&lt;table class='gmisc_table' style='border-collapse: collapse; margin-top: 1em; margin-bottom: 1em;' &gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Margin Of Victory&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;Median&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;IQR&lt;/th&gt;
+&lt;th style='border-bottom: 1px solid grey; border-top: 2px solid grey; text-align: center;'&gt;% Positive for Winner&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style='text-align: center;'&gt;SETS WON&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;2&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;1&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;100&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style='text-align: center;'&gt;GAMES WON&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;5&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;4&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;95&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style='text-align: center;'&gt;BREAK POINTS WON&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;2&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;2&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;90&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style='text-align: center;'&gt;TOTAL POINTS WON&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;14&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;10&lt;/td&gt;
+&lt;td style='text-align: center;'&gt;94&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;SERVE PERCENTAGE WON&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;10&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;12&lt;/td&gt;
+&lt;td style='border-bottom: 2px solid grey; text-align: center;'&gt;93&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+
+# Which is Best?
+
+.pull-left[
+![](https://media.giphy.com/media/dZGNPNR8EFnnq/giphy.gif)
+]
+
+.pull-right[
+- We want the MOV variable and model that will help us set more accurate expectations about future performance 
+
+- So we optimise (_K_, `\(\sigma\)`, `\(\alpha\)`) for accuracy
+
+- Then apply to new data to test model performance against each other
+]
+
+---
+
+# MOV Parameter Scale
+
+Standard Elo yields ratings with a SD of ~200. To maintain that property in the MOV models...
+
+--
+
+-  `\(\sigma \approx 200 / SD_{MOV}\)` in the E-Step
+
+--
+
+- `\(K \approx 10 / SD_{MOV}\)` in the U-Step
+
+
+---
+
+
+# Performance Comparison
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-17-1.png" width="864" style="display: block; margin: auto;" /&gt;
+
+---
+
+# Takeaways
+
+--
+
+- Most MOV models can improve predictions about win results
+
+--
+
+- Accuracy increases with the level of the event
+
+--
+
+- Improving predictions at the lowest-level events is difficult
+
+--
+
+- The joint additive model with serve percent won as the MOV has a lot to like
+
+---
+
+
+# Alex De Minaur MOV Rating
+
+&lt;img src="strength-to-strength_files/figure-html/unnamed-chunk-18-1.gif" style="display: block; margin: auto;" /&gt;
+
+
+---
+
+
+# Future Work
+
+--
+
+- Adjustments for match conditions
+
+--
+
+- Absence from play corrections
+
+--
+
+- Fully model-based analogs to allow for formal inference about ratings and predictions
+
+---
+
+# Resources
+
+- Slides [github.com/GIGTennis/MonashEBS](github.com/GIGTennis/MonashEBS)
+
+- ELO MOV Package [github.com/GIGTennis/elomov](github.com/GIGTennis/elomov)
+
+- On the T Blog [on-the-t.com](on-the-t.com)
+
+![](https://media.giphy.com/media/3o6wrxfEz0YeIeSPsY/giphy.gif)
+    </textarea>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function() {
+  var d = document, s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})();</script>
+
+<script>
+(function() {
+  var i, text, code, codes = document.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+})();
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
